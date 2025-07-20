@@ -1,0 +1,13 @@
+{
+    "evaluation_complete": {
+        "../result_baseline.json": {
+            "exact_match": 0.0,
+            "rouge_1": 0.09389116950229737,
+            "bertscore": 0.59568448797349,
+            "bleurt": 0.6049858523953345,
+            "descriptive_avg": 0.431520503290374,
+            "final_score": 0.215760251645187
+        }
+    },
+    "evalutation_fail": {}
+}
