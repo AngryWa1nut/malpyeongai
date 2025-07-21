@@ -109,7 +109,7 @@ if __name__ == "__main__":
     g = parser.add_argument_group("파일 경로")
     g.add_argument("--input", type=str, default="../data/korean_language_rag_V1.0_dev.json", help="입력 질문 파일 (JSON)")
     g.add_argument("--output", type=str, default="../result_rag_output.json", help="출력 답변 파일 (JSON)")
-    g.add_argument("--knowledge_base", type=str, default="../data/국어 지식 기반 생성(RAG) 참조 문서.docx", help="참조할 지식 문서 (.docx)")
+    g.add_argument("--knowledge_base", type=str, default="../../data/국어 지식 기반 생성(RAG) 참조 문서.docx", help="참조할 지식 문서 (.docx)")
 
     g = parser.add_argument_group("모델 및 실행 환경")
     g.add_argument("--model_id", type=str, default=1, help="Hugging Face 모델 ID")
