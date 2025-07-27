@@ -18,3 +18,11 @@ Thumbs.db
 # 대용량 모델/데이터 파일 (BLEURT-20, 로그 파일 등)
 evaluation/BLEURT-20
 
+data/qwen3-8B-korean-grammar-expert-merged/
+data/qwen3-8B-korean-grammar-expert-merged2/
+data/qwen3-8B-korean-grammar-expert/
+data/qwen3-8B-korean-grammar-expert2/
+
+# --- 캐시 파일 ---
+cache/
+wandb/
