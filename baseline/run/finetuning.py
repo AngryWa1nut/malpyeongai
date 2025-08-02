@@ -118,7 +118,6 @@ def main(args):
         load_best_model_at_end=True,
         disable_tqdm=False,
         # SFTTrainer에 있던 인자들을 SFTConfig로 이동
-        max_seq_length=args.max_seq_length,
     )
 
     # 수정: SFTTrainer 호출이 더 간결해집니다.
@@ -127,10 +126,12 @@ def main(args):
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         peft_config=lora_config,
-        #tokenizer=tokenizer,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
         args=training_args, # 여기에 SFTConfig 객체를 전달
         formatting_func=format_instruction, 
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
+        
     )
 
     trainer.train()
@@ -151,8 +152,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LLM을 LoRA로 파인튜닝하는 스크립트")
 
     parser.add_argument("--dataset_path", type=str, default="../../data/korean_language_rag_V1.0_train.json", help="훈련 데이터셋 JSON 파일 경로")
-    parser.add_argument("--base_model_id", type=str, default="Qwen/Qwen3-8B", help="파인튜닝할 기본 모델의 Hugging Face ID")
-    parser.add_argument("--output_dir", type=str, default="../../data/qwen3-8B-korean-grammar-expert2", help="훈련 결과물이 저장될 디렉토리")
+    parser.add_argument("--base_model_id", type=str, default="upstage/SOLAR-10.7B-Instruct-v1.0", help="파인튜닝할 기본 모델의 Hugging Face ID")
+    parser.add_argument("--output_dir", type=str, default="../../data/SOLAR-10.7B-Instruct-v1.0-grammar-expert", help="훈련 결과물이 저장될 디렉토리")
     
     parser.add_argument("--epochs", type=int, default=5, help="훈련 에포크 수 (EarlyStopping을 사용하므로 넉넉하게 설정)")
     parser.add_argument("--batch_size", type=int, default=2, help="훈련 배치 크기")

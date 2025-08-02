@@ -1,12 +1,11 @@
-# merge_model.py
 import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # 1. 기본 모델 ID와 저장된 LoRA 어댑터 경로 설정
 base_model_id = "Qwen/Qwen3-8B"
-adapter_path = "../../data/qwen3-8B-korean-grammar-expert2/final"
-save_path = "../../data/qwen3-8B-korean-grammar-expert2-merged" # 병합된 모델을 저장할 새 경로
+adapter_path = "../../data/SOLAR-10.7B-Instruct-v1.0-grammar-expert/final"
+save_path = "../../data/SOLAR-10.7B-Instruct-v1.0-grammar-expert-merged" # 병합된 모델을 저장할 새 경로
 
 # 2. 기본 모델과 토크나이저 로드
 print(f"'{base_model_id}' 에서 기본 모델을 로드합니다...")

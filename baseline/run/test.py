@@ -14,28 +14,77 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer
 )
-project_path = '/content/drive/MyDrive/malpyeong/baseline'
+
+# `src` 디렉토리가 경로에 없으면 추가
+project_path = str(Path(__file__).resolve().parent.parent)
 if project_path not in sys.path:
     sys.path.append(project_path)
 from src.retriever import Retriever
 
-# 수정: 모델이 간결한 답변을 생성하도록 프롬프트를 명확하고 강력하게 수정
-def create_prompt(query: str, context: str) -> str:
-    prompt_template = f"""### 역할:
+# --- 프롬프트 템플릿 정의 ---
+# test.py 파일 상단의 PROMPT_TEMPLATES 딕셔너리를 아래 내용으로 전체 교체하세요.
+
+PROMPT_TEMPLATES = PROMPT_TEMPLATES = {
+    "교정형": """### 역할:
 당신은 주어진 '참고 문서'를 기반으로 '질문'에 답변하는 한국어 어문 규범 전문가입니다.
 
 # 지시사항
 1. '참고 문서'와 당신의 지식을 종합하여 질문에 대한 답을 찾으세요.
-2. 아래 '좋은 답변의 예시'와 같이, 답변은 반드시 "{{올바른 문장}}이/가 옳다. {{이유}}" 형식으로 작성하세요.
-3. **이유는 핵심적인 근거만 간결하게 1~2 문장으로 요약하여 설명해야 합니다.**
-4. 불필요한 부연 설명이나 배경 지식을 나열하지 마세요.
+2. 답변은 반드시 아래 '좋은 답변의 예시'와 같이 "{{올바른 문장}}이/가 옳다. {{이유}}" 형식으로 작성하세요.
+3. 이유는 핵심적인 근거만 간결하게 1~2 문장으로 요약하여 설명해야 합니다.
+4. '잘못된 답변의 예시'처럼 명백히 틀린 사실을 생성하지 마세요.
+5. 만약 질문에 대한 답을 찾을 수 없다면, "정보를 찾을 수 없습니다."라고만 답변하세요.
 
 # 좋은 답변의 예시
-질문: "다음 문장에서 어문 규범에 부합하지 않는 부분을 찾아 고치고, 그 이유를 설명하세요.\\n\\"오늘은 퍼즐 마추기를 해 볼 거예요.\\""
-답변: "\"오늘은 퍼즐 맞추기를 해 볼 거예요.\"가 옳다. '제자리에 맞게 붙이다, 주문하다, 똑바르게 하다, 비교하다' 등의 뜻이 있는 말은 '마추다'가 아닌 '맞추다'로 적는다."
+질문: "다음 문장에서 어문 규범에 부합하지 않는 부분을 찾아 고치고, 그 이유를 설명하세요.\\n\\"해당 사업은 아직 진행중입니다.\\""
+답변: "\"해당 사업은 아직 진행 중입니다.\"가 옳다. '진행 중'의 '중'은 의존 명사이므로 앞말과 띄어 써야 한다."
+
+질문: "다음 문장이 어문 규범에 부합하도록 문장 부호를 추가하고, 그 이유를 설명하세요.\\n― 이번 추석 연휴(9. 16.(월)~9. 18.(수))에는 기숙사가 휴관합니다."
+답변: "\"이번 추석 연휴[9. 16.(월)~9. 18.(수)]에는 기숙사가 휴관합니다.\"가 옳다. 괄호 안에 또 괄호를 써야 할 때 바깥쪽의 괄호는 대괄호를 사용한다."
 
 ---
+# 잘못된 답변의 예시
+질문: "다음 문장에서 어문 규범에 부합하지 않는 부분을 찾아 고치고, 그 이유를 설명하세요.\\n\\"숫사자는 머리에 갈기가 있다.\\""
+답변: "\"수수사는 머리에 갈기가 있다.\"가 옳다."  # (X) '숫사자'는 올바른 표기이며, '수사자'로 써야 합니다. '수수사'는 완전히 잘못된 단어입니다.
 
+질문: "다음 문장에서 어문 규범에 부합하지 않는 부분을 찾아 고치고, 그 이유를 설명하세요.\\n\\"할머니 집에 게신가요?\\""
+답변: "\"해서 온 길목에 가신가요?가 옳다." # (X) 질문의 의도와 전혀 상관없는 문장을 생성한 잘못된 답변입니다. '계신가요'가 올바른 표현입니다.
+
+---
+### 참고 문서:
+{context}
+
+### 질문:
+{query}
+
+### 답변:
+""",
+    "선택형": """### 역할:
+당신은 주어진 '참고 문서'를 기반으로 '질문'에 답변하는 한국어 어문 규범 전문가입니다.
+
+# 지시사항
+1. '참고 문서'와 당신의 지식을 종합하여 질문에 대한 답을 찾으세요.
+2. 주어진 보기 중에서 가장 적절한 것을 선택하여 "~가 옳다." 형태로 답변하고, 그 이유를 설명하세요.
+3. 이유는 핵심적인 근거만 간결하게 1~2 문장으로 요약하여 설명해야 합니다.
+4. '잘못된 답변의 예시'처럼 명백히 틀린 사실을 이유로 들지 마세요.
+5. 만약 질문에 대한 답을 찾을 수 없다면, "정보를 찾을 수 없습니다."라고만 답변하세요.
+
+# 좋은 답변의 예시
+질문: "\"그 집은 {{부모 자식간/부모 자식 간}} 정이 두터운 것 같더라.\" 가운데 올바른 것을 선택하고, 그 이유를 설명하세요."
+답변: "\"그 집은 부모 자식 간 정이 두터운 것 같더라.\"가 옳다. '간'은 '사이'의 뜻을 나타내는 의존 명사이므로 앞말과 띄어 쓴다."
+
+질문: "\"나는 {{몰티즈/말티즈}}를 한 마리 키운다.\" 가운데 올바른 것을 선택하고, 그 이유를 설명하세요."
+답변: "\"나는 말티즈를 한 마리 키운다.\"가 옳다. 외래어 표기법에 따라 'Maltese'는 '말티즈'로 적는 것이 올바른 표기이다."
+
+---
+# 잘못된 답변의 예시
+질문: "\"막내가 {{빈대떡/빈자떡}}을 둥글넓적하게 만들었다.\" 가운데 올바른 것을 선택하고, 그 이유를 설명하세요."
+답변: "\"빈자떡\"이 옳다."  # (X) '빈대떡'이 표준어이므로 사실과 다른 잘못된 답변입니다.
+
+질문: "\"{{프라이팬/후라이팬}}을 사야 한다.\" 가운데 올바른 것을 선택하고, 그 이유를 설명하세요."
+답변: "\"후라이팬\"이 옳다." # (X) 외래어 표기법에 따라 'f'는 'ㅍ'으로 적으므로 '프라이팬'이 올바른 표기입니다.
+
+---
 ### 참고 문서:
 {context}
 
@@ -44,21 +93,36 @@ def create_prompt(query: str, context: str) -> str:
 
 ### 답변:
 """
-    return prompt_template
+}
+def create_prompt(query: str, context: str, q_type: str) -> str:
+    """질문 유형(q_type)에 따라 적절한 프롬프트를 반환합니다."""
+    template = PROMPT_TEMPLATES.get(q_type, PROMPT_TEMPLATES["교정형"])
+    return template.format(context=context, query=query)
 
-# 수정: 안정성을 높인 최종 후처리 함수
 def postprocess_answer(text: str) -> str:
     """
-    후처리 기능의 영향을 확인하기 위한 최소 기능 버전입니다.
+    개선된 후처리 함수: 정규표현식을 사용하여 답변 형식을 안정적으로 추출합니다.
     """
-    # 1. 불필요한 마커가 문장 시작에 오는 경우를 대비해 먼저 제거
-    stop_phrases = ["###", "[지침]", "[상황", "참고 문서:", "질문:"]
-    for phrase in stop_phrases:
-        if phrase in text:
-            text = text.split(phrase, 1)[0]
-            
-    return text.strip()
+    text = text.strip()
+    
+    if "### 답변:" in text:
+        text = text.split("### 답변:", 1)[-1].strip()
+    if "답변:" in text:
+        text = text.split("답변:", 1)[-1].strip()
 
+    m = re.search(r'([\"“`])(.*?)\1\s*가\s*옳다', text)
+    if m:
+        quote_content = m.group(2).strip()
+        corrected_sentence = f'"{quote_content}"가 옳다.'
+        explanation = text[m.end():].strip(' .')
+        if explanation:
+            return f"{corrected_sentence} {explanation}"
+        return corrected_sentence
+
+    text = re.sub(r'\s+', ' ', text).strip()
+    if not text:
+        return "답변을 생성하지 못했습니다." 
+    return text
 
 def load_dependencies(args: argparse.Namespace) -> Tuple[PreTrainedModel, PreTrainedTokenizer]:
     print(f"{args.precision}비트 정밀도로 모델과 토크나이저를 로드하는 중...")
@@ -106,9 +170,19 @@ def process_batch(
     prompts = []
     for item in batch:
         query = item['input']['question']
+        q_type = item['input'].get('question_type', '교정형')
+        
         retrieved_docs = retriever.search(query, top_n=args.top_n)
-        context = "\n\n".join(retrieved_docs)
-        prompts.append(create_prompt(query, context))
+        
+        context_parts = []
+        for i, doc in enumerate(retrieved_docs):
+            meta = doc.get('metadata') if isinstance(doc, dict) else {}
+            content = doc.get('content') if isinstance(doc, dict) else str(doc)
+            doc_info = f"[참고 문서 {i+1}: {meta.get('category_2', '')} {meta.get('regulation_id', '')} - {meta.get('content_type', '')}]"
+            context_parts.append(f"{doc_info}\n{content}")
+        
+        context = "\n\n".join(context_parts)
+        prompts.append(create_prompt(query, context, q_type))
 
     model_inputs = tokenizer(
         prompts,
@@ -125,16 +199,15 @@ def process_batch(
     ]
     terminators = [token_id for token_id in terminators if token_id is not None]
     
-    # 수정: 모든 점수의 균형을 맞추기 위한 '통제된 샘플링' 방식 적용
     outputs = model.generate(
         **model_inputs,
         max_new_tokens=256,
         eos_token_id=terminators,
         pad_token_id=tokenizer.eos_token_id,
-        repetition_penalty=1.2,
-        do_sample=True,          # 자연스러운 문장 생성을 위해 True로 설정
-        temperature=0.3,        # 매우 낮은 온도로 설정하여 사실상 결정적(deterministic)으로 작동하게 제어
-        top_p=0.9
+        do_sample=True,
+        top_p=0.9,
+        repetition_penalty=1.05,
+        temperature=0.7
     )
 
     generated_tokens = outputs[:, model_inputs.input_ids.shape[1]:]
@@ -144,7 +217,6 @@ def process_batch(
         raw_answer = output_texts[i].strip()
         clean_answer = postprocess_answer(raw_answer)
         item["output"] = {"answer": clean_answer}
-
 
 def main(args: argparse.Namespace) -> None:
     model, tokenizer = load_dependencies(args)
@@ -166,19 +238,23 @@ def main(args: argparse.Namespace) -> None:
     total_steps = (len(input_data) + args.batch_size - 1) // args.batch_size
     progress_bar = tqdm(total=total_steps, desc="RAG 처리 중")
 
+    # 결과를 새로 저장할 리스트
+    final_results = []
     for i in range(0, len(input_data), args.batch_size):
-        batch = input_data[i:i + args.batch_size]
+        # 원본 데이터의 복사본으로 배치 생성
+        batch = [item.copy() for item in input_data[i:i + args.batch_size]]
         process_batch(batch, retriever, model, tokenizer, args)
+        final_results.extend(batch)
         progress_bar.update(1)
     
     progress_bar.close()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(input_data, f, ensure_ascii=False, indent=4)
+        # 새로 생성된 결과 리스트를 저장
+        json.dump(final_results, f, ensure_ascii=False, indent=4)
     
     print(f"\nRAG 파이프라인 실행 완료! 결과가 '{output_path}' 파일에 저장되었습니다.")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="run_rag", description="배치 처리를 지원하는 RAG 파이프라인을 실행합니다.")
@@ -186,7 +262,7 @@ if __name__ == "__main__":
     g = parser.add_argument_group("파일 경로")
     g.add_argument("--input", type=str, default="../../data/korean_language_rag_V1.0_test.json", help="입력 질문 파일 (JSON)")
     g.add_argument("--output", type=str, default="../../data/result_rag_output.json", help="출력 답변 파일 (JSON)")
-    g.add_argument("--knowledge_base", type=str, default="../../data/labeling.json", help="참조할 지식 문서 (.docx)")
+    g.add_argument("--knowledge_base", type=str, default="../../data/labeling.json", help="참조할 지식 문서 (JSON)")
 
     g = parser.add_argument_group("모델 및 실행 환경")
     g.add_argument("--model_id", type=str, default="../../data/qwen3-8B-korean-grammar-expert-merged2", help="Hugging Face 모델 ID 또는 파인튜닝된 모델 경로")
@@ -196,7 +272,7 @@ if __name__ == "__main__":
     g.add_argument("--precision", type=str, default="16", choices=["16", "8", "4"], help="모델 로딩 정밀도 (16: float16, 8: int8, 4: nf4)")
 
     g = parser.add_argument_group("RAG 및 생성 파라미터")
-    g.add_argument("--top_n", type=int, default=1, help="검색기에서 가져올 관련 문서의 수")
+    g.add_argument("--top_n", type=int, default=3, help="검색기에서 가져올 관련 문서의 수")
     g.add_argument("--batch_size", type=int, default=8, help="한 번에 처리할 데이터의 수")
     g.add_argument("--max_length", type=int, default=2048, help="토크나이저의 최대 입력 길이")
     
